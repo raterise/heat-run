@@ -381,7 +381,7 @@ kbd{font-family:inherit;background:#fff;color:#111;border-radius:5px;padding:0 6
           <div class="opts"><button class="chip" id="saveDl">Download save file</button><button class="chip" id="saveOpen">Open save file…</button><input type="file" id="saveFile" accept=".txt,text/plain" hidden></div>
           <textarea id="saveTxt" rows="3" spellcheck="false" aria-label="Paste save code" placeholder="…or paste the contents of a save file here"></textarea>
           <div class="opts"><button class="chip" id="saveLoad">Load pasted save</button><span class="xmsg" id="saveMsg" role="status"></span></div></div>
-        <div class="sgrp" hidden><h4>Testing</h4><div class="opts"><button class="chip" id="allCarsBtn" aria-pressed="false">Unlock all cars &amp; customisation: Off</button></div></div>
+        <div class="sgrp"><h4>Unlock everything</h4><p class="xhint">Skip the grind: every car, every cosmetic and the Apex Formula. Switch it off any time to go back to what you have earned.</p><div class="opts"><button class="chip" id="allCarsBtn" aria-pressed="false">Unlock all cars &amp; customisation: Off</button></div></div>
       </div>
       <div class="setcol" id="setCamHost"></div>
       <div class="sgrp full"><h4>Controls</h4><p class="keys" id="keysHint"></p></div>
@@ -2224,7 +2224,7 @@ function updHUD(){
 
 /* ---------- Menus ---------- */
 function setAuto(v){S.auto=v;save();const b=$('autoBtn');b.textContent='Auto-drive: '+(v?'On':'Off');b.setAttribute('aria-pressed',v);
-  $('keysHint').innerHTML=(v?'Your car drives itself · ':'<kbd>↑</kbd> or <kbd>W</kbd> gas · ')+'<kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> steer · <kbd>Space</kbd> or <kbd>↓</kbd> brake and drift'+(v?'':' (hold when stopped to reverse)')+' · <kbd>P</kbd> pause · <kbd>M</kbd> mute · Stunt Park: in the air <kbd>↑</kbd> <kbd>↓</kbd> flip, <kbd>Space</kbd> + <kbd>←</kbd> <kbd>→</kbd> barrel roll, <kbd>R</kbd> reset car'}
+  $('keysHint').innerHTML=(v?'Your car drives itself · ':'<kbd>↑</kbd> or <kbd>W</kbd> gas · ')+'<kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> steer · <kbd>Space</kbd> or <kbd>↓</kbd> brake and drift'+(v?'':' (hold when stopped to reverse)')+' · <kbd>P</kbd> pause · <kbd>M</kbd> mute · Stunt Park: in the air <kbd>↑</kbd> <kbd>↓</kbd> flip, <kbd>Space</kbd> + <kbd>←</kbd> <kbd>→</kbd> barrel roll, <kbd>R</kbd> reset car · Grand Prix: <kbd>E</kbd> or <kbd>Shift</kbd> gear up, <kbd>Q</kbd> gear down'}
 function setMusic(v){S.music=v;save();const b=$('musicBtn');b.textContent='Music: '+(v?'On':'Off');b.setAttribute('aria-pressed',v)}
 $('autoBtn').onclick=()=>setAuto(!S.auto);
 const TODS={day:'Day',sunset:'Sunset',night:'Night'},RAINS={some:'Sometimes',never:'Never',always:'Always'};
