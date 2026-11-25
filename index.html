@@ -390,7 +390,7 @@ kbd{font-family:inherit;background:#fff;color:#111;border-radius:5px;padding:0 6
       <div class="setcol">
         <div class="sgrp"><h4>Time of day</h4><div class="opts" id="todOpts"></div></div>
         <div class="sgrp"><h4>Rain (Harbor City)</h4><div class="opts" id="rainOpts"></div></div>
-        <div class="sgrp"><h4>Driving</h4><div class="opts"><button class="chip" id="autoBtn" aria-pressed="false">Auto-drive: Off</button></div></div>
+        <div class="sgrp"><h4>Driving</h4><div class="opts"><button class="chip" id="autoBtn" aria-pressed="false">Auto-drive: Off</button><button class="chip" id="gpAutoBtn" aria-pressed="false">Grand Prix gears: Manual</button></div><p class="xhint">Automatic gears change for you, but each change takes a moment with no power, so manual is faster.</p></div>
         <div class="sgrp"><h4>Sound</h4><div class="opts"><button class="chip" id="musicBtn" aria-pressed="true">Music: On</button></div></div>
         <div class="sgrp"><h4>Save &amp; transfer</h4><p class="xhint">Download your progress as a text file, then paste it in on any browser or computer to carry on.</p>
           <div class="opts"><button class="chip" id="saveDl">Download save file</button><button class="chip" id="saveOpen">Open save file…</button><input type="file" id="saveFile" accept=".txt,text/plain" hidden></div>
@@ -1475,7 +1475,7 @@ const GP_AERO={formula:.0105,super:.0045,sports:.0038,muscle:.002,tank:.0005,bus
 function gpInit(slot){const n=TRK.pts.length,pc=CARS.find(c=>c.id===S.sel),st=carStats(pc),k=GP_AERO[pc.id]||.0015,P=TRK.pts;
   for(let i=0;i<n;i++){const kc=Math.abs(wrapA(P[(i+7)%n].a-P[(i-7+n)%n].a))/14,R=1/Math.max(kc,1e-4),den=1-k*R;TRK.vp[i]=den<.06?90:Math.min(90,Math.sqrt(16*R/den))}
   for(let r=0;r<3;r++)for(let i=n-1;i>=0;i--){const nx=TRK.vp[(i+1)%n];TRK.vp[i]=Math.min(TRK.vp[i],Math.sqrt(nx*nx+2*12.5))}
-  gp={k,phase:'lights',t:0,out:R(4.6,5.8),lit:0,lap:0,lapT0:0,raceT0:0,inv:false,best:0,last:0,fin:null,order:[],wear:0,pitT:0,gear:1,rpm:0,pos:slot+1,done:0,laps:[]};
+  gp={k,shiftT:0,pend:0,phase:'lights',t:0,out:R(4.6,5.8),lit:0,lap:0,lapT0:0,raceT0:0,inv:false,best:0,last:0,fin:null,order:[],wear:0,pitT:0,gear:1,rpm:0,pos:slot+1,done:0,laps:[]};
   const init=b=>{b.ti=gpNearest(b.x,b.z);let d=b.ti-TRK.s0;if(d>n/2)d-=n;if(d<-n/2)d+=n;b.prog=d};init(player);
   if(NET.race){gp.out=NET.race.out;gp.online=true;netGpInit();return}
   let r=1;for(let g=0;g<8;g++){if(g===slot)continue;const[x,z,a]=TRK.grid8[g],tm=GP_TEAMS[r++],sk=R(.9,.99)-g*.004;
@@ -1490,13 +1490,19 @@ function rivalAI(b,dt){if(!gp||!TRK)return;if(gp.phase==='lights'){b.thr=0;b.bra
   let vt=1e9;for(let k=0,L=Math.round(v*.8)+6;k<L;k+=2)vt=Math.min(vt,TRK.vp[(b.ti+k)%n]);vt*=b.ck;if(ahead&&ahead.f<7)vt=Math.min(vt,v*.92);if(b.fin)vt=Math.min(vt,18);
   if(v<vt-.8){b.thr=1;b.brake=0}else if(v>vt+2.5){b.thr=0;b.brake=1}else{b.thr=.35;b.brake=0}
   if(v<2&&gp.phase!=='lights'){b.stuckT+=dt;if(b.stuckT>3){const Q=P[(b.ti+4)%n];b.x=Q.x+Math.cos(Q.a)*b.lane;b.z=Q.z-Math.sin(Q.a)*b.lane;b.a=Q.a;b.vx=b.vz=0;b.stuckT=0}}else b.stuckT=0}
-function gpShift(d){if(!gp||!player)return;const ng=cl(gp.gear+d,1,8);if(ng===gp.gear)return;const sp=Math.max(0,player.speed||0);
+function gpAutoShift(dt){const p=player,g=gp.gear,sp=Math.max(0,p.speed||0);
+  if(gp.shiftT>0){gp.shiftT-=dt;if(gp.shiftT<=0){gp.gear=cl(g+gp.pend,1,8);gp.pend=0;tone(gp.gear>g?520:380,.04,'square',.03)}return}
+  const r=sp/(p.maxS*GP_GR[g-1]);
+  if(r>.97&&g<8&&p.thr>0){gp.pend=1;gp.shiftT=.38}
+  else if(g>1&&sp/(p.maxS*GP_GR[g-2])<.78&&(r<.52||p.brake)){gp.pend=-1;gp.shiftT=.25}}
+function gpShift(d){if(!gp||!player||S.gpAuto)return;const ng=cl(gp.gear+d,1,8);if(ng===gp.gear)return;const sp=Math.max(0,player.speed||0);
   if(d<0&&sp/(player.maxS*GP_GR[ng-1])>1.06){feed('Too fast to downshift','');tone(160,.08,'square',.04);return}gp.gear=ng;tone(d>0?520:380,.04,'square',.035)}
 function inR2(r,x,z,m){m=m||0;return x>r.x0-m&&x<r.x1+m&&z>r.z0-m&&z<r.z1+m}
 function gpUpdate(dt){const p=player;if(!gp||!TRK||!p)return;gp.t+=dt;const n=TRK.pts.length,racers=gpRacers();
   if(gp.phase==='lights'){const lit=Math.min(5,Math.floor(gp.t/.9));if(lit>gp.lit){gp.lit=lit;tone(440,.18,'square',.06)}
     if(gp.t>=gp.out){gp.phase='race';gp.lit=0;gp.raceT0=gp.lapT0=gp.t;popText('GO! GO! GO!');tone(880,.45,'square',.07)}return}
   for(const b of racers)if(b.kind!=='remote')gpTrack(b);
+  if(S.gpAuto)gpAutoShift(dt);
   const inPit=inR2(GP_PIT,p.x,p.z,1)||(p.z>596&&p.z<612&&(p.x>165&&p.x<210||p.x>540&&p.x<590));
   /* track limits */
   if(!inPit&&!gp.fin){const q=trkQuery(p.x,p.z,false);if(q&&Math.abs(q.d)>TRK.w/2+1.4&&!gp.inv){gp.inv=true;popText('TRACK LIMITS');feed('Lap time deleted','')}}
@@ -1694,7 +1700,7 @@ try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&typeof s==='obje
   if(s.cos&&typeof s.cos==='object')S.cos=s.cos;if(Array.isArray(s.own))S.own=s.own.filter(x=>typeof x==='string');S.allCos=!!s.allCos;S.cosMig=!!s.cosMig;S.allOnce=!!s.allOnce;S.scrap=+s.scrap||0;if(s.mast&&typeof s.mast==='object')S.mast=s.mast;if(s.prest&&typeof s.prest==='object')S.prest=s.prest;
   if(s.boost&&typeof s.boost==='object')S.boost=s.boost;if(s.eq&&s.eq.chase&&s.eq.stunt)S.eq=s.eq;S.sLv=+s.sLv||0;S.sDone=+s.sDone||0;
   if(Array.isArray(s.smis))S._smis=s.smis;
-  S.bestLap=+s.bestLap||0;S.bestStunt=+s.bestStunt||0;S.bestCombo=+s.bestCombo||0;S.parkRuns=+s.parkRuns||0;if(['stunt','drift','gp'].includes(s.mode))S.mode=s.mode;S.dLv=+s.dLv||0;if(Array.isArray(s.gpBest))S.gpBest=s.gpBest.filter(r=>r&&+r.t>0).slice(0,10);S.gpWins=+s.gpWins||0;S.gpPods=+s.gpPods||0;S.gpRaces=+s.gpRaces||0;S.dDone=+s.dDone||0;S.bestDrift=+s.bestDrift||0;S.bestDChain=+s.bestDChain||0;S.bestTouge=+s.bestTouge||0;S.driftRuns=+s.driftRuns||0;if(s.dz&&typeof s.dz==='object')S.dz=s.dz;if(Array.isArray(s.dmis))S._dmis=s.dmis;
+  S.bestLap=+s.bestLap||0;S.bestStunt=+s.bestStunt||0;S.bestCombo=+s.bestCombo||0;S.parkRuns=+s.parkRuns||0;if(['stunt','drift','gp'].includes(s.mode))S.mode=s.mode;S.dLv=+s.dLv||0;S.gpAuto=!!s.gpAuto;if(Array.isArray(s.gpBest))S.gpBest=s.gpBest.filter(r=>r&&+r.t>0).slice(0,10);S.gpWins=+s.gpWins||0;S.gpPods=+s.gpPods||0;S.gpRaces=+s.gpRaces||0;S.dDone=+s.dDone||0;S.bestDrift=+s.bestDrift||0;S.bestDChain=+s.bestDChain||0;S.bestTouge=+s.bestTouge||0;S.driftRuns=+s.driftRuns||0;if(s.dz&&typeof s.dz==='object')S.dz=s.dz;if(Array.isArray(s.dmis))S._dmis=s.dmis;
   S.mLv=+s.mLv||0;if(Array.isArray(s.missions))S.missions=s.missions.filter(m=>m&&MT[m.type]&&!m.done).slice(0,3);if(s.dc&&s.dc.type&&MT[s.dc.type])S.dc=s.dc}}catch(e){}
 for(const c of CARS){S.pieces[c.id]=S.pieces[c.id]||0;S.parts[c.id]=S.parts[c.id]||0;S.up[c.id]=S.up[c.id]||{eng:0,hand:0,arm:0}}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
@@ -1854,7 +1860,7 @@ function drive(b,dt){
   if(!inAir){
     const sRev=mode==='stunt'&&b===player;if(b.fakie&&(sp>-1||!b.thr))b.fakie=false;
     if(b===player&&mode==='gp'&&gp){const g=gp.gear,top=b.maxS*GP_GR[g-1],r=Math.max(0,sp)/top;gp.rpm=r;
-      if(b.thr>0){const tq=r<.22?.12+r*1.2:r<.6?.38+(r-.22)*1.6:r<.92?1:Math.max(0,1-(r-.92)*12);sp+=b.maxS*b.acc*.62*tq*[1.6,1.3,1.08,.9,.76,.65,.56,.49][g-1]*dt;if(sp>top)sp=top}else if(b.thr<0)sp+=(-9-sp)*2.5*dt;else sp*=Math.exp(-(.08+.45/g)*dt)}
+      if(b.thr>0&&gp.shiftT>0){sp*=Math.exp(-.05*dt)}else if(b.thr>0){const tq=r<.22?.12+r*1.2:r<.6?.38+(r-.22)*1.6:r<.92?1:Math.max(0,1-(r-.92)*12);sp+=b.maxS*b.acc*.62*tq*[1.6,1.3,1.08,.9,.76,.65,.56,.49][g-1]*dt;if(sp>top)sp=top}else if(b.thr<0)sp+=(-9-sp)*2.5*dt;else sp*=Math.exp(-(.08+.45/g)*dt)}
     else if(sRev&&b.fakie&&b.thr>0)sp+=(-b.maxS*boost-sp)*b.acc*(boost>1?2.4:1)*dt;
     else if(b.thr>0)sp+=(b.maxS*boost*b.thr-sp)*b.acc*(boost>1?2.4:1)*(rain&&b===player?.8:1)*dt;else if(b.thr<0)sp+=sRev?(-b.maxS*boost-sp)*b.acc*(boost>1?2.4:1)*dt:(-9-sp)*2.5*dt;else sp*=Math.exp(-.9*dt);
     if(b.brake){if(mode==='gp'&&(b===player||b.kind==='rival'))sp-=Math.sign(sp)*Math.min(Math.abs(sp),15*dt);else sp*=Math.exp(-(b.dead?2.5:mode==='drift'&&b===player?.55:rain||TH.snow?1.15:1.8)*dt)}}
@@ -2282,7 +2288,7 @@ function updHUD(){
   {const d=$('cdial'),deg=Math.round((camYaw-Math.PI)*180/Math.PI);if(d.dataset.r!=deg){d.dataset.r=deg;d.style.transform=`rotate(${deg}deg)`;for(const b of d.children){const t=b.style.transform.replace(/ rotate\(.*\)/,'');b.style.transform=t+` rotate(${-deg}deg)`}}}
   if(state!=='play'&&state!=='dying')return;
   {const kmh=Math.round(Math.hypot(player.vx,player.vz)*3.6),g=mode==='gp'&&gp;if(kmh!==hudSpd){hudSpd=kmh;$('spdV').textContent=kmh}const sd=$('speedo');sd.classList.toggle('gp',!!g);
-    if(g){const r=cl(gp.rpm,0,1);$('gearV').textContent=gp.gear;$('rpmBar').style.width=(r*100)+'%';sd.classList.toggle('shift',r>.9);$('tyreV').style.width=((1-gp.wear)*100)+'%';$('tyreV').style.background=gp.wear>.6?'#ff4b3a':gp.wear>.35?'#ffc93a':'#5ee07a';sd.classList.toggle('lim',!!gp.limiter)}else $('rpmBar').style.width=cl(kmh/(player.maxS*3.6),0,1)*100+'%'}
+    if(g){const r=cl(gp.rpm,0,1);$('gearV').textContent=(gp.shiftT>0?'·':gp.gear)+(S.gpAuto?'A':'');$('rpmBar').style.width=(r*100)+'%';sd.classList.toggle('shift',r>.9);$('tyreV').style.width=((1-gp.wear)*100)+'%';$('tyreV').style.background=gp.wear>.6?'#ff4b3a':gp.wear>.35?'#ffc93a':'#5ee07a';sd.classList.toggle('lim',!!gp.limiter)}else $('rpmBar').style.width=cl(kmh/(player.maxS*3.6),0,1)*100+'%'}
   if(mode==='gp'&&gp){const pc=`P${gp.pos}`;if(pc!==hudCash){hudCash=pc;$('cashRun').textContent=pc+' / '+gpRacers().length}
     $('tdown').textContent=gp.phase==='lights'?'Hold the brake… watch the lights':gp.fin?(gp.online?'Chequered flag! Waiting for the others…':'Chequered flag!'):`Lap ${Math.min(GP_LAPS,gp.lap+1)} / ${GP_LAPS}`+(gp.lap+1===GP_LAPS?' · FINAL LAP':'');
     $('timer').textContent=gp.phase==='race'&&!gp.fin?`⏱ ${fmtMs(gp.t-gp.lapT0)}`+(gp.inv?' ✕':''):gp.fin?fmtMs(gp.fin.t):'';
@@ -2303,6 +2309,7 @@ function updHUD(){
 }
 
 /* ---------- Menus ---------- */
+function setGpAuto(v){S.gpAuto=!!v;save();const b=$('gpAutoBtn');b.textContent='Grand Prix gears: '+(v?'Automatic':'Manual');b.setAttribute('aria-pressed',!!v)}
 function setAuto(v){S.auto=v;save();const b=$('autoBtn');b.textContent='Auto-drive: '+(v?'On':'Off');b.setAttribute('aria-pressed',v);
   $('keysHint').innerHTML=(v?'Your car drives itself · ':'<kbd>↑</kbd> or <kbd>W</kbd> gas · ')+'<kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> steer · <kbd>Space</kbd> or <kbd>↓</kbd> brake and drift'+(v?'':' (hold when stopped to reverse)')+' · <kbd>P</kbd> pause · <kbd>M</kbd> mute · Stunt Park: in the air <kbd>↑</kbd> <kbd>↓</kbd> flip, <kbd>Space</kbd> + <kbd>←</kbd> <kbd>→</kbd> barrel roll, <kbd>R</kbd> reset car · Grand Prix: <kbd>E</kbd> or <kbd>Shift</kbd> gear up, <kbd>Q</kbd> gear down'}
 function setMusic(v){S.music=v;save();const b=$('musicBtn');b.textContent='Music: '+(v?'On':'Off');b.setAttribute('aria-pressed',v)}
@@ -2397,7 +2404,7 @@ $('cBuy').onclick=()=>{const c=CARS[garIdx],cid=c.id,k=cusTab;if(!cPrev||cPrev.k
   S.own.push(cid+'/'+k+':'+cPrev.id);S.cos[cid]=Object.assign(cosOf(cid),{[k]:cPrev.id});save();[523,659,784].forEach((f,i)=>setTimeout(()=>tone(f,.12,'square',.05),i*80));renderCus();$('gCash').textContent='$'+S.cash};
 function toGarage(){$('ginfo').classList.remove('cus');$('gCus').hidden=true;cPrev=null;state='garage';garIdx=Math.max(0,CARS.findIndex(c=>c.id===S.sel));show('garage');renderGarage();$('gAct').focus()}
 $('playBtn').onclick=()=>{audio();NET.race=null;mode=S.mode;startRun()};$('againBtn').onclick=()=>{if(NET.race){toMenu();return}startRun()};
-$('onlineBtn').onclick=openOnline;$('netCreate').onclick=()=>{if(netName())netConnect(randRoom())};$('netJoinBtn').onclick=()=>{if(!netName())return;const c=$('netCode').value.trim();if(c)netConnect(c);else{$('netStatus').textContent='Type the room code your friend sent you';$('netCode').focus()}};
+$('gpAutoBtn').onclick=()=>setGpAuto(!S.gpAuto);$('onlineBtn').onclick=openOnline;$('netCreate').onclick=()=>{if(netName())netConnect(randRoom())};$('netJoinBtn').onclick=()=>{if(!netName())return;const c=$('netCode').value.trim();if(c)netConnect(c);else{$('netStatus').textContent='Type the room code your friend sent you';$('netCode').focus()}};
 $('netCode').onkeydown=e=>{if(e.key==='Enter')$('netJoinBtn').click()};$('netLeave').onclick=()=>netLeave();$('netStart').onclick=()=>{if(netHost())netHostStart()};$('netBack').onclick=()=>{netLeave();toMenu()};
 $('netName').onchange=()=>{if(netName())netTrack()};$('netCopy').onclick=()=>{const u=location.origin+location.pathname+'#room='+NET.room;const ok=()=>{NET.status='Invite link copied: send it to your friends';netUI()};try{navigator.clipboard.writeText(u).then(ok,()=>{NET.status=u;netUI()})}catch(e){NET.status=u;netUI()}};$('garageBtn').onclick=toGarage;$('overGarage').onclick=toGarage;$('overMenu').onclick=toMenu;$('garBack').onclick=toMenu;
 $('gPrev').onclick=()=>{garIdx=(garIdx+CARS.length-1)%CARS.length;if($('ginfo').classList.contains('cus')){if(!S.owned.includes(CARS[garIdx].id))openCus(false);else{cPrev=null;renderCus()}}renderGarage()};$('gNext').onclick=()=>{garIdx=(garIdx+1)%CARS.length;if($('ginfo').classList.contains('cus')){if(!S.owned.includes(CARS[garIdx].id))openCus(false);else{cPrev=null;renderCus()}}renderGarage()};
@@ -2524,7 +2531,7 @@ function loop(now){
   }
   music();render();updHUD();drawOverlay();requestAnimationFrame(loop);
 }
-genCity(S.map);resize();makeThumbs();setEnv(S.tod,false);fillMissions();setMute(S.mute);setAuto(S.auto);setMusic(S.music);renderStars(true);for(let i=0;i<12;i++)spawnCiv();toMenu();requestAnimationFrame(loop);
+genCity(S.map);resize();makeThumbs();setEnv(S.tod,false);fillMissions();setMute(S.mute);setAuto(S.auto);setMusic(S.music);renderStars(true);for(let i=0;i<12;i++)spawnCiv();setGpAuto(S.gpAuto);toMenu();requestAnimationFrame(loop);
 {const m=/#room=([A-Za-z0-9]{3,6})/.exec(location.hash);if(m)setTimeout(()=>{S.mode='gp';save();renderMode();openOnline();$('netCode').value=m[1].toUpperCase();if(S.name)netConnect(m[1]);try{history.replaceState(null,'',location.pathname)}catch(e){}},400)}
 }
 
