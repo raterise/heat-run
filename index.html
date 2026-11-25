@@ -1472,7 +1472,7 @@ const GP_GR=[.36,.52,.67,.81,.95,1.08,1.2,1.3],GP_CASH=[800,500,350,250,180,120,
 function gpNearest(x,z){const P=TRK.pts;let bi=0,bd=1e9;for(let i=0;i<P.length;i+=2){const d=Math.hypot(P[i].x-x,P[i].z-z);if(d<bd){bd=d;bi=i}}return bi}
 function gpTrack(b){const P=TRK.pts,n=P.length;let bi=b.ti,bd=1e9;for(let k=-15;k<70;k++){const i=(b.ti+k+n)%n,d=Math.hypot(P[i].x-b.x,P[i].z-b.z);if(d<bd){bd=d;bi=i}}
   if(bd>45)bi=gpNearest(b.x,b.z);let dl=bi-b.ti;if(dl>n/2)dl-=n;if(dl<-n/2)dl+=n;b.prog+=dl;b.ti=bi}
-const GP_AERO={formula:.0105,super:.0045,sports:.0038,muscle:.002,tank:.0005,bus:.0005,van:.0008,monster:.001};
+const GP_AERO={formula:.0088,super:.0045,sports:.0038,muscle:.002,tank:.0005,bus:.0005,van:.0008,monster:.001};
 function gpInit(slot){const n=TRK.pts.length,pc=CARS.find(c=>c.id===S.sel),st=carStats(pc),k=GP_AERO[pc.id]||.0015,P=TRK.pts;
   for(let i=0;i<n;i++){const kc=Math.abs(wrapA(P[(i+7)%n].a-P[(i-7+n)%n].a))/14,R=1/Math.max(kc,1e-4),den=1-k*R;TRK.vp[i]=den<.06?90:Math.min(90,Math.sqrt(19.5*R/den))}
   for(let r=0;r<3;r++)for(let i=n-1;i>=0;i--){const nx=TRK.vp[(i+1)%n];TRK.vp[i]=Math.min(TRK.vp[i],Math.sqrt(nx*nx+2*12.5))}
@@ -1892,7 +1892,7 @@ function drive(b,dt){
     airW+=((rollK?0:b.steer)*top-airW)*Math.min(1,dt*7/m);const spin=airW*dt;b.a+=spin;airRot+=spin;
     if(trick){const upK=keys.ArrowUp||keys.KeyW;if(!upK)b.gasHeld=false;const fIn=(upK&&!b.gasHeld?1:0)-(keys.ArrowDown||keys.KeyS?1:0),ft=7.2/Math.pow(m,.65);
       airF+=(fIn*ft-airF)*Math.min(1,dt*6/m);b.fp=(b.fp||0)+airF*dt;airR+=((rollK?b.steer:0)*ft*1.15-airR)*Math.min(1,dt*6/m);b.fr=(b.fr||0)-airR*dt}}
-  const ice=TH.snow&&!rain,lake=HZ.ice.length&&onIce(b),wet=lake?(b===player?.2:.3):rain?(b===player?.4:.55):ice?(b===player?.5:.62):1;const dm=mode==='drift'&&b===player&&!inAir,gw=b===player&&mode==='gp'&&gp?1-gp.wear*.35:1,grip=gw*(inAir?0:b.dead?4:dm?(b.brake?1.2:b.slip>3?b.grip*.62:b.grip*.95):(b.brake&&b.kind==='player'?(rain||TH.snow?.8:1.3):b.grip*wet));if(gph){const ls=Math.hypot(lx,lz);if(ls>1e-4){const c=Math.min(ls,gA*dt);lx-=lx/ls*c;lz-=lz/ls*c;sp-=Math.sign(sp)*Math.min(Math.abs(sp),ls*.45*dt)}}else{const k=Math.exp(-grip*dt);lx*=k;lz*=k}
+  const ice=TH.snow&&!rain,lake=HZ.ice.length&&onIce(b),wet=lake?(b===player?.2:.3):rain?(b===player?.4:.55):ice?(b===player?.5:.62):1;const dm=mode==='drift'&&b===player&&!inAir,gw=b===player&&mode==='gp'&&gp?1-gp.wear*.35:1,grip=gw*(inAir?0:b.dead?4:dm?(b.brake?1.2:b.slip>3?b.grip*.62:b.grip*.95):(b.brake&&b.kind==='player'?(rain||TH.snow?.8:1.3):b.grip*wet));if(gph){const ls=Math.hypot(lx,lz);if(ls>1e-4){const c=Math.min(ls,gA*1.3*dt);lx-=lx/ls*c;lz-=lz/ls*c;sp-=Math.sign(sp)*Math.min(Math.abs(sp),ls*.45*dt)}}else{const k=Math.exp(-grip*dt);lx*=k;lz*=k}
   if(dm&&b.thr>0&&sp>5){const ls=Math.hypot(lx,lz);if(ls>.5){const t=ls*1.1*dt;lx-=lx/ls*t;lz-=lz/ls*t;sp+=t*.85}}
   if(dm&&!b.brake&&sp>5){const va=Math.atan2(fx*sp+lx,fz*sp+lz),sa=wrapA(va-b.a),into=b.steer&&Math.sign(b.steer)===-Math.sign(sa);b.a+=sa*Math.min(1,(into?.6:Math.abs(sa)>.6?3.2:2)*dt)}
   b.vx=fx*sp+lx;b.vz=fz*sp+lz;b.x+=b.vx*dt;b.z+=b.vz*dt;
