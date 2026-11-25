@@ -21,6 +21,7 @@ canvas{display:block}
 .hud[hidden],.screen[hidden],.rpbar[hidden]{display:none}
 .tl{position:absolute;left:14px;top:12px;display:flex;gap:12px;align-items:center}
 .money b{display:block;font-size:30px;line-height:1;color:var(--y)}
+.tower{list-style:none;margin:8px 0 0;padding:6px;border-radius:12px;background:rgba(10,12,18,.72);box-shadow:0 0 0 2px #000;font-family:Arial,sans-serif;font-weight:800;font-size:13px;width:min(220px,44vw)}.tower li{display:grid;grid-template-columns:20px 10px 1fr auto;align-items:center;gap:6px;padding:3px 6px;border-radius:7px;color:#e8eef7}.tower li.me{background:rgba(255,210,63,.22);color:#fff}.tower li i{width:8px;height:8px;border-radius:50%;display:block}.tower li em{font-style:normal;color:#aab6c8;font-size:12px;font-variant-numeric:tabular-nums}.tower li.out{opacity:.5}
 .money span{font-size:14px;font-family:Arial,sans-serif;font-weight:700}
 .tc{position:absolute;left:50%;top:10px;transform:translateX(-50%);text-align:center}
 .stars{font-size:38px;letter-spacing:4px;line-height:1;white-space:nowrap}
@@ -264,7 +265,7 @@ kbd{font-family:inherit;background:#fff;color:#111;border-radius:5px;padding:0 6
   <canvas id="ov"></canvas>
   <div class="tl">
     <button class="ib" id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="3" width="4.5" height="14" rx="1.5"/><rect x="11.5" y="3" width="4.5" height="14" rx="1.5"/></svg></button>
-    <div class="money out"><b id="cashRun">$0</b><span id="tdown">0 takedowns</span></div>
+    <div class="money out"><b id="cashRun">$0</b><span id="tdown">0 takedowns</span><ol class="tower" id="gpTower" hidden></ol></div>
   </div>
   <div class="tc out"><div class="stars" id="stars"></div><div id="timer">0:00</div><div id="escape"></div><div id="navTag"></div></div>
   <div class="compass" aria-hidden="true"><div class="dial" id="cdial"><b class="n" style="transform:translateY(-19px)">N</b><b style="transform:translateX(19px)">E</b><b style="transform:translateY(19px)">S</b><b style="transform:translateX(-19px)">W</b></div><i class="tick"></i></div>
@@ -1581,7 +1582,7 @@ function boardRows(){const B=NET.board;if(B==='err')return'<li><span>World leade
 function netBoardUI(){const e=$('netBoard');if(e)e.innerHTML=boardRows();if(state==='menu'&&S.mode==='gp')$('menuMis').innerHTML=gpBoardHTML()}
 /* lobby UI */
 function openOnline(){audio();state='online';show('online');$('netName').value=S.name||'';netUI();lbFetch(true);(S.name?$('netCreate'):$('netName')).focus()}
-function netUI(){const o=$('online');if(!o)return;const inRoom=!!NET.room;$('netJoin').hidden=inRoom;$('netRoom').hidden=!inRoom;$('netStatus').textContent=NET.status;
+function netUI(){const o=$('online');if(!o)return;{const ps=netPeers(),inR=NET.ok&&NET.room&&ps.some(q=>q.id===netId());if(inR){const h=netHost();if(h&&NET.wasHost===false&&!NET.status)NET.status='The host left, so you are now the host';NET.wasHost=h}else NET.wasHost=null}const inRoom=!!NET.room;$('netJoin').hidden=inRoom;$('netRoom').hidden=!inRoom;$('netStatus').textContent=NET.status;
   if(inRoom){$('netRoomCode').textContent=NET.room;const ps=netPeers(),host=netHost();
     $('netList').innerHTML=ps.map((p,i)=>`<li class="${p.id===netId()?'day':''}"><span>${i<NET_MAX?'':'(waiting) '}${htmlEsc(p.name)}${p.id===netId()?' (you)':''}${i===0?' · host':''}</span><b>${htmlEsc(carById(p.car).name)}${p.st==='racing'?' · racing':''}</b></li>`).join('')||'<li><span>Joining…</span></li>';
     const b=$('netStart');b.hidden=!host;b.disabled=!NET.ok||ps.some(p=>p.st==='racing'&&p.id!==netId());b.textContent=ps.length<2?'START (SOLO TEST)':`START RACE (${Math.min(ps.length,NET_MAX)})`;
@@ -2254,6 +2255,12 @@ function drawOverlay(){
   const W=OV.width,H=OV.height;ox.clearRect(0,0,W,H);
   if(!player||state==='over')return;
   if(state!=='replay')drawStorm(W,H);
+  if(mode==='gp'&&VP){const m=VP,dp=devicePixelRatio;ox.font=`800 ${13*dp}px Arial,sans-serif`;ox.textAlign='center';ox.textBaseline='middle';
+    for(const b of bodies){if(b.kind!=='remote'&&b.kind!=='rival')continue;const x=b.x,y=(b.y||0)+2.6,z=b.z,w=m[3]*x+m[7]*y+m[11]*z+m[15];if(w<=.5)continue;
+      const sx=((m[0]*x+m[4]*y+m[8]*z+m[12])/w*.5+.5)*W,sy=(1-((m[1]*x+m[5]*y+m[9]*z+m[13])/w*.5+.5))*H;if(sx<-50||sx>W+50||sy<-30||sy>H+30)continue;
+      const d=Math.hypot(b.x-player.x,b.z-player.z);if(b.kind==='rival'&&d>60)continue;const t=String(b.name||'Driver'),tw=ox.measureText(t).width+16*dp,th=20*dp;ox.globalAlpha=b.kind==='rival'?.7:.95;
+      ox.fillStyle='rgba(10,12,18,.8)';ox.beginPath();ox.roundRect?ox.roundRect(sx-tw/2,sy-th/2,tw,th,6*dp):ox.rect(sx-tw/2,sy-th/2,tw,th);ox.fill();ox.fillStyle=`rgb(${b.col.map(v=>v*255|0)})`;ox.fillRect(sx-tw/2,sy+th/2-3*dp,tw,3*dp);ox.fillStyle='#fff';ox.fillText(t,sx,sy-1*dp)}
+    ox.globalAlpha=1}
   if(TH.snow&&!rain&&state!=='replay'){ox.fillStyle='rgba(255,255,255,.85)';while(rainDrops.length<140)rainDrops.push([Math.random()*W,Math.random()*H,R(.6,1.4),Math.random()*6]);
     for(const d of rainDrops){d[3]+=.03;d[1]+=2.2*d[2]*devicePixelRatio;d[0]+=Math.sin(d[3])*.8*devicePixelRatio;if(d[1]>H){d[1]=-6;d[0]=Math.random()*W}ox.beginPath();ox.arc(d[0],d[1],d[2]*1.6*devicePixelRatio,0,6.3);ox.fill()}}
   if(rain&&state!=='replay'){ox.strokeStyle='rgba(200,220,255,.35)';ox.lineWidth=1.5*devicePixelRatio;ox.beginPath();
@@ -2294,7 +2301,11 @@ function updHUD(){
     $('timer').textContent=gp.phase==='race'&&!gp.fin?`⏱ ${fmtMs(gp.t-gp.lapT0)}`+(gp.inv?' ✕':''):gp.fin?fmtMs(gp.fin.t):'';
     $('escape').textContent=(gp.last?`Last ${fmtMs(gp.last)}`:'')+(gp.best?` · Best ${fmtMs(gp.best)}`:'');
     $('navTag').textContent=gp.limiter?(gp.pitT>0?`PIT STOP ${Math.max(0,2.5-gp.pitT).toFixed(1)}s`:'PIT LIMITER 80 km/h'):gp.inv&&!gp.fin?'LAP DELETED: track limits':'';
+    {const tw=$('gpTower');tw.hidden=!gp.stand||gp.phase==='lights';if(!tw.hidden&&T-(gp.twT||0)>.25){gp.twT=T;const n=TRK.pts.length,lead=gp.stand[0];
+      tw.innerHTML=gp.stand.slice(0,8).map((b,i)=>{const me=b===player,gap=i===0?(b.fin?'FIN':'Lap '+Math.min(GP_LAPS,Math.max(1,Math.floor(b.prog/n)+1))):b.fin?'FIN':b.dnf?'OUT':'+'+Math.max(0,(lead.prog-b.prog)/Math.max(8,Math.hypot(b.vx,b.vz)||25)).toFixed(1);
+        return`<li class="${me?'me':''} ${b.dnf?'out':''}"><span>${i+1}</span><i style="background:rgb(${(me?carById(S.sel).col:b.col).map(v=>v*255|0)})"></i><span>${me?'You':htmlEsc(b.name||'Driver')}</span><em>${gap}</em></li>`}).join('')}}
     $('combo').classList.remove('on');return}
+  $('gpTower').hidden=true;
   if(mode!=='chase'){if(Math.round(sScore)!==hudCash){hudCash=Math.round(sScore);$('cashRun').textContent=hudCash.toLocaleString()}$('tdown').textContent=mode==='drift'?(dr.zone?`◆ ${dr.zone.n} x2 · `:'')+`best chain ${Math.round(bestCombo).toLocaleString()}`:`★ ${starsGot}/${sstars.length} stars · best combo ${bestCombo.toLocaleString()}`;
     $('timer').textContent=race.run?`⏱ ${fmtMs(race.t)}`:race.last?`Last lap ${fmtMs(race.last)}`:'';{const bl=mode==='drift'?S.bestTouge:S.bestLap,nm=mode==='drift'?'touge':'lap';$('escape').textContent=race.run?`Checkpoint ${race.cp}/${TRK?TRK.cps.length:3}`+(bl?` · Best ${fmtMs(bl)}`:''):bl?`Best ${nm} ${fmtMs(bl)}`:''}
     $('navTag').textContent=nav?`➜ ${nav.n} · ${Math.round(Math.hypot(player.x-nav.x,player.z-nav.z))} m`:'';
