@@ -1474,7 +1474,7 @@ function gpTrack(b){const P=TRK.pts,n=P.length;let bi=b.ti,bd=1e9;for(let k=-15;
   if(bd>45)bi=gpNearest(b.x,b.z);let dl=bi-b.ti;if(dl>n/2)dl-=n;if(dl<-n/2)dl+=n;b.prog+=dl;b.ti=bi}
 const GP_AERO={formula:.0105,super:.0045,sports:.0038,muscle:.002,tank:.0005,bus:.0005,van:.0008,monster:.001};
 function gpInit(slot){const n=TRK.pts.length,pc=CARS.find(c=>c.id===S.sel),st=carStats(pc),k=GP_AERO[pc.id]||.0015,P=TRK.pts;
-  for(let i=0;i<n;i++){const kc=Math.abs(wrapA(P[(i+7)%n].a-P[(i-7+n)%n].a))/14,R=1/Math.max(kc,1e-4),den=1-k*R;TRK.vp[i]=den<.06?90:Math.min(90,Math.sqrt(16*R/den))}
+  for(let i=0;i<n;i++){const kc=Math.abs(wrapA(P[(i+7)%n].a-P[(i-7+n)%n].a))/14,R=1/Math.max(kc,1e-4),den=1-k*R;TRK.vp[i]=den<.06?90:Math.min(90,Math.sqrt(19.5*R/den))}
   for(let r=0;r<3;r++)for(let i=n-1;i>=0;i--){const nx=TRK.vp[(i+1)%n];TRK.vp[i]=Math.min(TRK.vp[i],Math.sqrt(nx*nx+2*12.5))}
   gp={k,shiftT:0,pend:0,phase:'lights',t:0,out:R(4.6,5.8),lit:0,lap:0,lapT0:0,raceT0:0,inv:false,best:0,last:0,fin:null,order:[],wear:0,pitT:0,gear:1,rpm:0,pos:slot+1,done:0,laps:[]};
   const init=b=>{b.ti=gpNearest(b.x,b.z);let d=b.ti-TRK.s0;if(d>n/2)d-=n;if(d<-n/2)d+=n;b.prog=d};init(player);
@@ -1776,11 +1776,30 @@ if(Array.isArray(S._smis))S.smis=S._smis.filter(m=>m&&SMT[m.type]&&!m.done).slic
 function carStats(c){const u=S.up[c.id],pr=1+.03*(S.prest[c.id]||0);return{spd:c.spd*(1+.05*u.eng)*pr,hand:c.hand*(1+.06*u.hand)*pr,grip:5.2*(1+.05*u.hand),hp:Math.round(c.hp*(1+.15*u.arm)*(1+.08*(S.prest[c.id]||0))),mass:c.mass}}
 
 /* ---------- Audio ---------- */
-let ac=null,master,musG,eng,engF,engG,sir,sirG,noiseBuf;
+let ac=null,master,musG,eng,engF,engG,sir,sirG,noiseBuf,EN=null;
+/* engine synth: three tuned oscillators + intake noise, firing-pulse tremolo, soft clipping and an rpm-tracking filter */
+const ENG={hatch:[46,205,.55,.3,.18,.05,'buzz'],taxi:[42,185,.55,.35,.16,.08],muscle:[26,128,.45,.55,.14,.42],pickup:[30,140,.45,.5,.2,.3],sports:[52,260,.6,.3,.14,.08],van:[34,150,.4,.45,.32,.12],bus:[24,96,.35,.5,.42,.1],
+  super:[62,330,.65,.25,.12,.1],monster:[27,125,.4,.55,.22,.38],tank:[19,78,.3,.55,.5,.15],formula:[88,430,.7,.2,.1,.04]};
+function engBuild(){const o=k=>{const x=ac.createOscillator();x.type=k;x.start();return x};
+  EN={o1:o('sawtooth'),o2:o('square'),o3:o('sawtooth'),lfo:o('sine'),g1:ac.createGain(),g2:ac.createGain(),g3:ac.createGain(),am:ac.createGain(),amD:ac.createGain(),ws:ac.createWaveShaper(),nf:ac.createBiquadFilter(),ng:ac.createGain(),rpm:.2,vg:1,last:-1};
+  const c=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/511.5-1;c[i]=Math.tanh(x*2.2)}EN.ws.curve=c;
+  engF=ac.createBiquadFilter();engF.type='lowpass';engF.Q.value=2.2;engG=ac.createGain();engG.gain.value=0;eng=EN.o1;
+  EN.o1.connect(EN.g1);EN.o2.connect(EN.g2);EN.o3.connect(EN.g3);for(const g of[EN.g1,EN.g2,EN.g3])g.connect(EN.am);
+  EN.am.gain.value=1;EN.lfo.connect(EN.amD).connect(EN.am.gain);EN.am.connect(EN.ws).connect(engF).connect(engG).connect(master);
+  const nb=ac.createBufferSource();nb.buffer=noiseBuf;nb.loop=true;nb.start();EN.nf.type='bandpass';EN.nf.Q.value=.9;nb.connect(EN.nf).connect(EN.ng).connect(engF)}
+function engUpdate(){if(!EN||!player)return;const t=ac.currentTime,P=ENG[player.type]||ENG.hatch,sp=Math.abs(player.speed||0),load=player.thr>0?1:player.brake?.15:.35;let rpm;
+  if(mode==='gp'&&gp){rpm=cl(gp.rpm,0,1.02)*.88+.12;if(gp.phase==='lights')rpm=.18+(keys.ArrowUp||keys.KeyW?.55:0)}
+  else{const f=cl(sp/Math.max(10,player.maxS),0,1.2),G=[0,.2,.38,.56,.76,1.2];let g=1;while(g<G.length-1&&f>G[g])g++;rpm=.24+.74*cl((f-G[g-1])/(G[g]-G[g-1]),0,1);if(player.air)rpm=Math.min(1,EN.rpm+.02)}
+  EN.rpm+=(rpm-EN.rpm)*.35;const r=EN.rpm,f0=P[0]+(P[1]-P[0])*r;
+  EN.o1.frequency.setTargetAtTime(f0,t,.03);EN.o2.frequency.setTargetAtTime(f0*.5,t,.03);EN.o3.frequency.setTargetAtTime(f0*1.5+.7,t,.03);
+  EN.g1.gain.setTargetAtTime(P[2]*.5,t,.05);EN.g2.gain.setTargetAtTime(P[3]*.5,t,.05);EN.g3.gain.setTargetAtTime(.12*(.4+r),t,.05);
+  EN.lfo.frequency.setTargetAtTime(f0*.25,t,.03);EN.amD.gain.setTargetAtTime(P[5]*(1.1-r*.6),t,.05);
+  EN.nf.frequency.setTargetAtTime(600+r*2600,t,.05);EN.ng.gain.setTargetAtTime(P[4]*(.25+load*.75)*.35,t,.05);
+  engF.frequency.setTargetAtTime((350+r*2400)*(.55+.45*load),t,.06);
+  engG.gain.setTargetAtTime(state==='play'?(.022+.02*load)*(mode==='gp'&&gp&&gp.shiftT>0?.45:1):0,t,.06)}
 function audio(){try{if(!ac){ac=new(window.AudioContext||window.webkitAudioContext)();master=ac.createGain();master.connect(ac.destination);musG=ac.createGain();musG.gain.value=.55;musG.connect(master);
-  eng=ac.createOscillator();eng.type='sawtooth';engF=ac.createBiquadFilter();engF.type='lowpass';engF.frequency.value=500;engG=ac.createGain();engG.gain.value=0;eng.connect(engF).connect(engG).connect(master);eng.start();
   sir=ac.createOscillator();sir.type='triangle';sirG=ac.createGain();sirG.gain.value=0;sir.connect(sirG).connect(master);sir.start();
-  noiseBuf=ac.createBuffer(1,ac.sampleRate,ac.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
+  noiseBuf=ac.createBuffer(1,ac.sampleRate,ac.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;engBuild()}
   master.gain.value=S.mute?0:1;if(ac.state==='suspended')ac.resume()}catch(e){ac=null}}
 function noise(dur,vol,freq,when,type,dest){if(!ac||S.mute)return;try{const t=when||ac.currentTime,s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();s.buffer=noiseBuf;f.type=type||'lowpass';f.frequency.value=freq;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);s.connect(f).connect(g).connect(dest||master);s.start(t);s.stop(t+dur)}catch(e){}}
 function tone(f,d,type,vol,slide,when,dest){if(!ac||S.mute)return;try{const o=ac.createOscillator(),g=ac.createGain(),t=when||ac.currentTime;o.type=type||'square';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(f*slide,t+d);g.gain.setValueAtTime(vol||.05,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(dest||master);o.start(t);o.stop(t+d+.02)}catch(e){}}
@@ -1866,7 +1885,7 @@ function drive(b,dt){
     else if(b.thr>0)sp+=(b.maxS*boost*b.thr-sp)*b.acc*(boost>1?2.4:1)*(rain&&b===player?.8:1)*dt;else if(b.thr<0)sp+=sRev?(-b.maxS*boost-sp)*b.acc*(boost>1?2.4:1)*dt:(-9-sp)*2.5*dt;else sp*=Math.exp(-.9*dt);
     if(b.brake){if(mode==='gp'&&(b===player||b.kind==='rival'))sp-=Math.sign(sp)*Math.min(Math.abs(sp),15*dt);else sp*=Math.exp(-(b.dead?2.5:mode==='drift'&&b===player?.55:rain||TH.snow?1.15:1.8)*dt)}}
   const gph=mode==='gp'&&!inAir&&(b===player||b.kind==='rival')&&TRK;let gA=0;
-  if(gph){const q=trkQuery(b.x,b.z,false),off=!q||Math.abs(q.d)>TRK.w/2+.6;gA=(16+(gp?gp.k:.0015)*sp*sp)*(b===player&&gp?1-gp.wear*.3:1)*(off?.55:1)*(b.brake?.92:1);if(off&&Math.abs(sp)>4)sp*=Math.exp(-.7*dt);b.offT=off}
+  if(gph){const q=trkQuery(b.x,b.z,false),off=!q||Math.abs(q.d)>TRK.w/2+.6;gA=(19.5+(gp?gp.k:.0015)*sp*sp)*(b===player&&gp?1-gp.wear*.3:1)*(off?.55:1)*(b.brake?.92:1);if(off&&Math.abs(sp)>4)sp*=Math.exp(-.7*dt);b.offT=off}
   let turn=inAir?0:b.steer*b.hand*Math.min(1,Math.abs(sp)/7)*(sp<0?-1:1)*(mode==='drift'&&b===player?1.05+Math.min(.15,(b.slip||0)*.01):1);if(gph){const cap=gA*1.45/Math.max(5,Math.abs(sp));turn=cl(turn,-cap,cap)}if(!b.dead)b.a+=turn*dt;
   if(inAir&&b.qpA&&b.qpW)b.a+=b.qpW*dt;
   if(inAir&&b===player&&!b.dead){const m=b.mass||1,top=8.4/Math.pow(m,.65),trick=mode==='stunt'&&!b.qpA,rollK=trick&&keys.Space;
@@ -2164,7 +2183,7 @@ function update(dt){
   for(const p of parts){p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vy-=p.gr*dt;if(p.y<.05&&p.gr){p.y=.05;p.vy*=-.3;p.vx*=.7;p.vz*=.7}p.vx*=.97;p.vz*=.97;p.l-=dt;p.s=Math.max(.05,p.s+p.g*dt)}
   parts=parts.filter(p=>p.l>0);
   shake=Math.max(0,shake-dt*2.2);
-  if(ac&&playing&&!paused&&player){const sp=Math.abs(player.speed||0);eng.frequency.setTargetAtTime(mode==='gp'&&gp?42+gp.rpm*150+gp.gear*5:38+sp*2.6,ac.currentTime,.05);engF.frequency.setTargetAtTime(300+sp*25,ac.currentTime,.1);engG.gain.setTargetAtTime(state==='play'?.035:0,ac.currentTime,.1);
+  if(ac&&playing&&!paused&&player){engUpdate();
     let nd=1e9;for(const b of bodies)if(b.kind==='cop'&&!b.dead)nd=Math.min(nd,Math.hypot(b.x-player.x,b.z-player.z));
     const ph=(performance.now()/1000)%1.2;sir.frequency.setTargetAtTime(ph<.6?740:560,ac.currentTime,.02);sirG.gain.setTargetAtTime(state==='play'?cl(1-nd/110,0,1)*.03:0,ac.currentTime,.1)}
 }
