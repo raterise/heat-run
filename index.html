@@ -1506,7 +1506,7 @@ function gpUpdate(dt){const p=player;if(!gp||!TRK||!p)return;gp.t+=dt;const n=TR
   if(S.gpAuto)gpAutoShift(dt);
   const inPit=inR2(GP_PIT,p.x,p.z,1)||(p.z>596&&p.z<612&&(p.x>165&&p.x<210||p.x>540&&p.x<590));
   /* track limits */
-  if(!inPit&&!gp.fin){const q=trkQuery(p.x,p.z,false);if(q&&Math.abs(q.d)>TRK.w/2+1.4&&!gp.inv){gp.inv=true;popText('TRACK LIMITS');feed('Lap time deleted','')}}
+  if(!inPit&&!gp.fin){const q=trkQuery(p.x,p.z,false);if(q&&Math.abs(q.d)>TRK.w/2+3.2){gp.offT=(gp.offT||0)+dt;if(gp.offT>.6&&!gp.inv){gp.inv=true;popText('TRACK LIMITS');feed('Lap time deleted','')}}else gp.offT=Math.max(0,(gp.offT||0)-dt*2)}
   /* pit lane */
   gp.limiter=inR2(GP_PIT,p.x,p.z,0);if(gp.limiter){const v=Math.hypot(p.vx,p.vz);if(v>22){p.vx*=22/v;p.vz*=22/v}}
   if(inR2(GP_BOX,p.x,p.z)&&Math.hypot(p.vx,p.vz)<1.5){if(gp.pitT>=0){gp.pitT+=dt;if(gp.pitT>=2.5){gp.pitT=-1;if(gp.wear>.01){gp.wear=0;popText('FRESH TYRES!');tone(784,.15,'square',.05);setTimeout(()=>tone(1046,.2,'square',.05),120)}}}}else if(!inR2(GP_BOX,p.x,p.z,2))gp.pitT=0;
@@ -1885,7 +1885,7 @@ function drive(b,dt){
     else if(b.thr>0)sp+=(b.maxS*boost*b.thr-sp)*b.acc*(boost>1?2.4:1)*(rain&&b===player?.8:1)*dt;else if(b.thr<0)sp+=sRev?(-b.maxS*boost-sp)*b.acc*(boost>1?2.4:1)*dt:(-9-sp)*2.5*dt;else sp*=Math.exp(-.9*dt);
     if(b.brake){if(mode==='gp'&&(b===player||b.kind==='rival'))sp-=Math.sign(sp)*Math.min(Math.abs(sp),15*dt);else sp*=Math.exp(-(b.dead?2.5:mode==='drift'&&b===player?.55:rain||TH.snow?1.15:1.8)*dt)}}
   const gph=mode==='gp'&&!inAir&&(b===player||b.kind==='rival')&&TRK;let gA=0;
-  if(gph){const q=trkQuery(b.x,b.z,false),off=!q||Math.abs(q.d)>TRK.w/2+.6;gA=(19.5+(gp?gp.k:.0015)*sp*sp)*(b===player&&gp?1-gp.wear*.3:1)*(off?.55:1)*(b.brake?.92:1);if(off&&Math.abs(sp)>4)sp*=Math.exp(-.7*dt);b.offT=off}
+  if(gph){const q=trkQuery(b.x,b.z,false),off=!q||Math.abs(q.d)>TRK.w/2+1.8;gA=(19.5+(gp?gp.k:.0015)*sp*sp)*(b===player&&gp?1-gp.wear*.3:1)*(off?.55:1)*(b.brake?.92:1);if(off&&Math.abs(sp)>4)sp*=Math.exp(-.7*dt);b.offT=off}
   let turn=inAir?0:b.steer*b.hand*Math.min(1,Math.abs(sp)/7)*(sp<0?-1:1)*(mode==='drift'&&b===player?1.05+Math.min(.15,(b.slip||0)*.01):1);if(gph){const cap=gA*1.45/Math.max(5,Math.abs(sp));turn=cl(turn,-cap,cap)}if(!b.dead)b.a+=turn*dt;
   if(inAir&&b.qpA&&b.qpW)b.a+=b.qpW*dt;
   if(inAir&&b===player&&!b.dead){const m=b.mass||1,top=8.4/Math.pow(m,.65),trick=mode==='stunt'&&!b.qpA,rollK=trick&&keys.Space;
