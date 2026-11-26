@@ -1378,7 +1378,7 @@ function genDrift(){
 /* ---------- Grand Prix circuit ---------- */
 const GP_WP=[[150,620],[300,620],[450,620],[560,620],[615,618],[645,595],[648,555],[620,505],[630,450],[668,405],[690,340],[680,280],[640,235],[650,180],[690,135],[670,80],[610,60],[540,75],[470,70],[440,70],[400,90],[350,72],[300,72],[240,70],[175,85],[140,135],[175,180],[245,195],[300,230],[310,290],[265,330],[205,330],[150,360],[95,400],[70,470],[80,540],[105,595]];
 const GP_TEAMS=[{n:'You',c:[.92,.12,.12]},{n:'R. Vance',c:[.1,.35,.95]},{n:'K. Mori',c:[.98,.62,.08]},{n:'L. Santos',c:[.12,.7,.42]},{n:'J. Becker',c:[.85,.85,.88]},{n:'A. Novak',c:[.62,.22,.85]},{n:'T. Okafor',c:[.1,.75,.85]},{n:'M. Rossi',c:[.95,.85,.15]}];
-const GP_PIT={x0:205,x1:548,z0:583,z1:602},GP_BOX={x0:296,x1:314,z0:585,z1:593},GP_LAPS=5;
+const GP_PIT={x0:205,x1:548,z0:583,z1:602},GP_BOX={x0:302,x1:320,z0:584.6,z1:593},GP_LAPS=5;
 let gp=null;
 function splinePath(WP){const n=WP.length,d=[];for(let i=0;i<n;i++){const p0=WP[(i-1+n)%n],p1=WP[i],p2=WP[(i+1)%n],p3=WP[(i+2)%n];for(let k=0;k<60;k++){const t=k/60,t2=t*t,t3=t2*t;d.push([0,1].map(q=>.5*(2*p1[q]+(-p0[q]+p2[q])*t+(2*p0[q]-5*p1[q]+4*p2[q]-p3[q])*t2+(-p0[q]+3*p1[q]-3*p2[q]+p3[q])*t3)))}}
   const o=[d[0]];let acc=0;for(let i=1;i<=d.length;i++){let a=d[i-1];const b=d[i%d.length];let L=Math.hypot(b[0]-a[0],b[1]-a[1]);while(acc+L>=1){const t=(1-acc)/L,q=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];o.push(q);a=q;L=Math.hypot(b[0]-a[0],b[1]-a[1]);acc=0}acc+=L}
@@ -1437,7 +1437,11 @@ function genGP(){
     quad([170,.05,611],[205,.05,z1],[205,.05,z0+9],[188,.05,611],[.26,.27,.3]);quad([548,.05,z1],[585,.05,611],[565,.05,611],[548,.05,z0+9],[.26,.27,.3]);
     box(statics,(x0+x1)/2+3,0,604.3,x1-x0-18,1.1,1.2,[.88,.88,.9],[.75,.76,.8]);coll(x0+12,603.6,x1-6,605,1.2);for(let x=x0+14;x<x1-6;x+=3)box(statics,x,1.1,604.3,.1,2.6,.1,[.5,.52,.56]);
     vquad([x0+12,2.2,604.3],[x1-6,2.2,604.3],[x1-6,3.7,604.3],[x0+12,3.7,604.3],[.55,.58,.62]);
-    for(let t=0;t<8;t++){const bx=x0+22+t*42,c=GP_TEAMS[t].c;lay({x0:bx-9,x1:bx+9,z0:z0+2,z1:z0+9.4},c.map(v=>v*.55+.12),.058);lay({x0:bx-9,x1:bx-8.6,z0:z0+2,z1:z0+9.4},WHT,.062);lay({x0:bx+8.6,x1:bx+9,z0:z0+2,z1:z0+9.4},WHT,.062)}
+    /* your pit box: bright red with a white frame, a stop line and a lit sign above it */
+    {const B=GP_BOX;lay({x0:B.x0-.5,x1:B.x1+.5,z0:B.z0-.5,z1:B.z1+.5},WHT,.064);lay(B,[.85,.08,.06],.066);lay({x0:B.x1-1.2,x1:B.x1-.6,z0:B.z0+.6,z1:B.z1-.6},WHT,.068);
+     for(let k=1;k<=6;k++){const cx=B.x0-6*k;lay({x0:cx-1.6,x1:cx,z0:(B.z0+B.z1)/2-.35,z1:(B.z0+B.z1)/2+.35},[1,.82,.15],.064)}
+     box(statics,(B.x0+B.x1)/2,0,B.z0-1.4,.25,4.2,.25,[.3,.3,.32]);box(statics,(B.x0+B.x1)/2,4.2,B.z0-1.4,4.4,1.3,.3,[.85,.08,.06],[.95,.2,.15]);box(statics,(B.x0+B.x1)/2,4.45,B.z0-1.25,3.6,.8,.1,[1,.95,.9])}
+    for(let t=0;t<8;t++){const bx=x0+22+t*42,c=GP_TEAMS[t].c;if(bx===311)continue;lay({x0:bx-9,x1:bx+9,z0:z0+2,z1:z0+9.4},c.map(v=>v*.55+.12),.058);lay({x0:bx-9,x1:bx-8.6,z0:z0+2,z1:z0+9.4},WHT,.062);lay({x0:bx+8.6,x1:bx+9,z0:z0+2,z1:z0+9.4},WHT,.062)}
     const gz0=554,gz1=z0-1;box(statics,(x0+x1)/2,0,(gz0+gz1)/2,x1-x0,7.5,gz1-gz0,[.9,.9,.92],[.6,.62,.66]);coll(x0,gz0,x1,gz1,7.5);
     for(let t=0;t<8;t++){const bx=x0+22+t*42,c=GP_TEAMS[t].c;box(statics,bx,0,gz1+.05,30,5.2,.2,[.08,.08,.1]);box(statics,bx,5.2,gz1+.1,32,.7,.3,c);box(statics,bx-15.5,0,gz1+.1,1,5.2,.3,c);box(statics,bx+15.5,0,gz1+.1,1,5.2,.3,c)}
     box(statics,(x0+x1)/2,7.5,(gz0+gz1)/2+1,x1-x0+2,3.2,gz1-gz0+2,GLS,[.85,.86,.9]);box(statics,(x0+x1)/2,10.7,(gz0+gz1)/2+2,x1-x0+6,.5,gz1-gz0+6,[.95,.95,.97]);
@@ -1512,7 +1516,9 @@ function gpUpdate(dt){const p=player;if(!gp||!TRK||!p)return;gp.t+=dt;const n=TR
   if(!inPit&&!gp.fin){const Q=TRK.pts[p.ti],od=Q?Math.hypot(p.x-Q.x,p.z-Q.z):0;if(od>TRK.w/2+3.2){gp.offT=(gp.offT||0)+dt;if(gp.offT>.6&&!gp.inv){gp.inv=true;popText('TRACK LIMITS');feed('Lap time deleted','')}}else gp.offT=Math.max(0,(gp.offT||0)-dt*2)}
   /* pit lane */
   gp.limiter=inR2(GP_PIT,p.x,p.z,0);if(gp.limiter){const v=Math.hypot(p.vx,p.vz);if(v>22){p.vx*=22/v;p.vz*=22/v}}
-  if(inR2(GP_BOX,p.x,p.z)&&Math.hypot(p.vx,p.vz)<1.5){if(gp.pitT>=0){gp.pitT+=dt;if(gp.pitT>=2.5){gp.pitT=-1;if(gp.wear>.01){gp.wear=0;popText('FRESH TYRES!');tone(784,.15,'square',.05);setTimeout(()=>tone(1046,.2,'square',.05),120)}}}}else if(!inR2(GP_BOX,p.x,p.z,2))gp.pitT=0;
+  if(inR2(GP_BOX,p.x,p.z,.6)&&gp.pitT>=0&&Math.hypot(p.vx,p.vz)<15){const k=Math.exp(-dt*7);p.vx*=k;p.vz*=k;if(p.speed!=null)p.speed*=k}
+  if(gp.pitT>0&&gp.pitT<2.5){p.vx=p.vz=0;if(p.speed!=null)p.speed=0}
+  if(inR2(GP_BOX,p.x,p.z,.6)&&Math.hypot(p.vx,p.vz)<1.5){if(gp.pitT>=0){gp.pitT+=dt;if(gp.pitT>=2.5){gp.pitT=-1;if(gp.wear>.01){gp.wear=0;popText('FRESH TYRES!');tone(784,.15,'square',.05);setTimeout(()=>tone(1046,.2,'square',.05),120)}}}}else if(!inR2(GP_BOX,p.x,p.z,2.5))gp.pitT=0;
   const v=Math.hypot(p.vx,p.vz);if(v>5&&!p.air)gp.wear=Math.min(1,gp.wear+dt*(.0017+Math.min(.008,(p.slip||0)*.0009)));
   /* live delta + sectors */
   if(!gp.fin){const ld=p.prog-gp.lap*n,lt=gp.t-gp.lapT0;if(ld>=0&&ld<n){const ix=Math.floor(ld/10);if(gp.cur[ix]==null)gp.cur[ix]=+lt.toFixed(2);
@@ -2334,7 +2340,7 @@ function updHUD(){
     $('timer').textContent=gp.phase==='race'&&!gp.fin?`⏱ ${fmtMs(gp.t-gp.lapT0)}`+(gp.inv?' ✕':''):gp.fin?fmtMs(gp.fin.t):'';
     $('escape').textContent=(gp.last?`Last ${fmtMs(gp.last)}`:'')+(gp.best?` · Best ${fmtMs(gp.best)}`:'');
     {const e=$('gpDelta');let txt='',c='#fff';if(gp.flash&&gp.t-gp.flash.t<3){txt=gp.flash.txt;c=gp.flash.c}else if(gp.dl!=null&&gp.phase==='race'&&!gp.fin&&!gp.inv){txt=(gp.dl<0?'−':'+')+Math.abs(gp.dl).toFixed(2);c=gp.dl<0?'#5ee07a':'#ff5a4a'}e.hidden=!txt;e.textContent=txt;e.style.color=c}
-    $('navTag').textContent=gp.limiter?(gp.pitT>0?`PIT STOP ${Math.max(0,2.5-gp.pitT).toFixed(1)}s`:'PIT LIMITER 80 km/h'):gp.inv&&!gp.fin?'LAP DELETED: track limits':'';
+    $('navTag').textContent=gp.limiter?(gp.pitT>0?`PIT STOP ${Math.max(0,2.5-gp.pitT).toFixed(1)}s · TYRES`:gp.pitT<0?'PIT STOP DONE · GO GO GO':'PIT LIMITER 80 km/h · STOP IN THE RED BOX'):gp.inv&&!gp.fin?'LAP DELETED: track limits':'';
     {const tw=$('gpTower');tw.hidden=!gp.stand||gp.phase==='lights';if(!tw.hidden&&T-(gp.twT||0)>.25){gp.twT=T;const n=TRK.pts.length,lead=gp.stand[0];
       tw.innerHTML=gp.stand.slice(0,8).map((b,i)=>{const me=b===player,gap=i===0?(b.fin?'FIN':'Lap '+Math.min(GP_LAPS,Math.max(1,Math.floor(b.prog/n)+1))):b.fin?'FIN':b.dnf?'OUT':'+'+Math.max(0,(lead.prog-b.prog)/Math.max(20,Math.hypot(lead.vx,lead.vz)||30)).toFixed(1);
         return`<li class="${me?'me':''} ${b.dnf?'out':''}"><span>${i+1}</span><i style="background:rgb(${(me?carById(S.sel).col:b.col).map(v=>v*255|0)})"></i><span>${me?'You':htmlEsc(b.name||'Driver')}</span><em>${gap}</em></li>`}).join('')}}
