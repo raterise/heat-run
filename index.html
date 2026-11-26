@@ -2226,8 +2226,10 @@ function fpGeo(type){const bb=(MESH[type]&&MESH[type].bb)||{h:1.4,hood:.7,zf:2.2
 function lp(M,x,y,z){return[M[0]*x+M[4]*y+M[8]*z+M[12],M[1]*x+M[5]*y+M[9]*z+M[13],M[2]*x+M[6]*y+M[10]*z+M[14]]}
 function fpCam(f){const b=player,G=fpGeo(b.type);bodyModel(b);const M=MM.slice();
   let ey=G.ey,ez=G.ez;if(f===2){if(G.cab){ey=G.ey-.3;ez=G.bb.zf+.1}else{ey=G.bb.hood+.42;ez=G.bb.zf*.3}}
-  const bob=Math.min(.04,Math.hypot(b.vx,b.vz)*.0006)*Math.sin(flashT*27),sk=shake*.25;
-  const eye=lp(M,R(-sk,sk),ey+bob+R(-sk,sk),ez),tg=lp(M,(b.steer||0)*-.6,ey-.55,ez+12);
+  const sk=Math.min(shake,.6)*.08,eye=lp(M,0,ey,ez),tg=lp(M,(b.steer||0)*-.6,ey-.55,ez+12);
+  /* smooth out suspension/pitch jitter: x/z follow exactly, height and look pitch are low-passed */
+  const F=fpCam.s||(fpCam.s={ey:eye[1],ty:tg[1],t:0});if(Math.abs(F.ey-eye[1])>3||flashT-F.t>.5){F.ey=eye[1];F.ty=tg[1]}F.t=flashT;
+  F.ey=lerp(F.ey,eye[1],.12);F.ty=lerp(F.ty,tg[1],.06);eye[1]=F.ey+R(-sk,sk);tg[1]=F.ty;eye[0]+=R(-sk,sk);
   return{eye,tgt:tg}}
 const CPIT={};
 function drawCockpit(b){const G=fpGeo(b.type);let m=CPIT[b.type];
