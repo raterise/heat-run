@@ -2215,7 +2215,7 @@ function update(dt){
 /* ---------- Render ---------- */
 function setCam(eye,target,fov,far,near){const asp=C.width/C.height;const pr=persp(fov,asp,near||2.5,far||700);VP=mul(pr,look(eye,target));camEye=eye;gl.uniformMatrix4fv(U.uVP,false,VP);gl.uniform3fv(U.uCam,eye)}
 const DEAD=[.16,.15,.14];
-function bodyModel(b,yo){model(b.x,b.y+(yo||0)+(Math.abs(b.roll)>1.5?1.6:0),b.z,b.a,(b.pitch||0)+(b.fp||0),b.roll+(b.lean||0)+(b.fr||0),1);
+function bodyModel(b,yo){model(b.x,b.y+(yo||0)+(Math.abs(b.roll)>1.5?1.6:0),b.z,b.a,(b.pitch||0)+(b.fp||0),b.roll+(b.fr||0),1);
   if(b.fp||b.fr){const h=.85;MM[12]-=MM[4]*h;MM[13]+=h-MM[5]*h;MM[14]-=MM[6]*h;gl.uniformMatrix4fv(U.uM,false,MM)}}
 
 /* first-person: 1 = cockpit, 2 = bonnet */
