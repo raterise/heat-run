@@ -431,6 +431,7 @@ kbd{font-family:inherit;background:#fff;color:#111;border-radius:5px;padding:0 6
 {
 'use strict';
 const $=id=>document.getElementById(id);
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const C=$('c');
 const gl=C.getContext('webgl',{antialias:true,alpha:false})||C.getContext('experimental-webgl');
 if(!gl){document.body.insertAdjacentHTML('beforeend','<div class="err">Your browser could not start 3D graphics (WebGL). Try another browser like Chrome, Edge or Firefox.</div>');throw new Error('no webgl')}
@@ -575,7 +576,7 @@ const SPECS={
   turn:{W:0,L:0,build(a){disc(a,5.5,0,[.32,.34,.38],48);disc(a,5.2,.02,[.4,.42,.46],48)}}
 };
 const MESH={},SHADOW={};
-for(const k in SPECS){const a=[];SPECS[k].build(a);MESH[k]=mkVBO(a);const s=SPECS[k];if(s.W){const b=[];const w=s.W/2+.25,l=s.L/2+.25;flat(b,[[-w,-l],[w,-l],[w,l],[-w,l]],0,[0,0,0]);SHADOW[k]=mkVBO(b)}}
+for(const k in SPECS){const a=[];SPECS[k].build(a);MESH[k]=mkVBO(a);const s=SPECS[k];if(s.W){let h=0,hd=0,zf=0;for(let i=0;i<a.length;i+=9){const y=a[i+1],z=a[i+2];if(y>h)h=y;if(z>zf)zf=z}for(let i=0;i<a.length;i+=9)if(a[i+2]>zf-s.L*.2&&a[i+1]>hd)hd=a[i+1];MESH[k].bb={h,hood:hd,zf,w:s.W,l:s.L}}if(s.W){const b=[];const w=s.W/2+.25,l=s.L/2+.25;flat(b,[[-w,-l],[w,-l],[w,l],[-w,l]],0,[0,0,0]);SHADOW[k]=mkVBO(b)}}
 
 /* ---------- Maps ---------- */
 const N=12,P=62,RW=16,LOT=P-RW,EDGE=RW/2,MAPW=N*P,SINK=EDGE+3.5;
@@ -1719,7 +1720,7 @@ try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&typeof s==='obje
     const u=s.up&&s.up[c.id]||{};S.up[c.id]={eng:cl(+u.eng||0,0,UPMAX),hand:cl(+u.hand||0,0,UPMAX),arm:cl(+u.arm||0,0,UPMAX)}}
   if(s.daily&&typeof s.daily==='object')S.daily={last:String(s.daily.last||''),streak:Math.max(0,+s.daily.streak||0)};
   if(s.tokens)for(const k in S.tokens)S.tokens[k]=Math.max(0,+s.tokens[k]||0);
-  if(s.cam&&typeof s.cam==='object')S.cam={ang:cl(+s.cam.ang||66,20,85),dist:cl(+s.cam.dist||50,22,90),follow:!!s.cam.follow};
+  if(s.cam&&typeof s.cam==='object')S.cam={ang:cl(+s.cam.ang||66,20,85),dist:cl(+s.cam.dist||50,22,90),follow:!!s.cam.follow,fp:cl(+s.cam.fp|0,0,2)};
   if(Array.isArray(s.ownedBak)){S.ownedBak=s.ownedBak.filter(id=>CARS.some(c=>c.id===id));if(!S.ownedBak.includes('hatch'))S.ownedBak.unshift('hatch')}
   if(s.cos&&typeof s.cos==='object')S.cos=s.cos;if(Array.isArray(s.own))S.own=s.own.filter(x=>typeof x==='string');S.allCos=!!s.allCos;S.cosMig=!!s.cosMig;S.allOnce=!!s.allOnce;S.scrap=+s.scrap||0;if(s.mast&&typeof s.mast==='object')S.mast=s.mast;if(s.prest&&typeof s.prest==='object')S.prest=s.prest;
   if(s.boost&&typeof s.boost==='object')S.boost=s.boost;if(s.eq&&s.eq.chase&&s.eq.stunt)S.eq=s.eq;S.sLv=+s.sLv||0;S.sDone=+s.sDone||0;
@@ -2212,10 +2213,39 @@ function update(dt){
 }
 
 /* ---------- Render ---------- */
-function setCam(eye,target,fov,far){const asp=C.width/C.height;const pr=persp(fov,asp,2.5,far||700);VP=mul(pr,look(eye,target));camEye=eye;gl.uniformMatrix4fv(U.uVP,false,VP);gl.uniform3fv(U.uCam,eye)}
+function setCam(eye,target,fov,far,near){const asp=C.width/C.height;const pr=persp(fov,asp,near||2.5,far||700);VP=mul(pr,look(eye,target));camEye=eye;gl.uniformMatrix4fv(U.uVP,false,VP);gl.uniform3fv(U.uCam,eye)}
 const DEAD=[.16,.15,.14];
 function bodyModel(b,yo){model(b.x,b.y+(yo||0)+(Math.abs(b.roll)>1.5?1.6:0),b.z,b.a,(b.pitch||0)+(b.fp||0),b.roll+(b.lean||0)+(b.fr||0),1);
   if(b.fp||b.fr){const h=.85;MM[12]-=MM[4]*h;MM[13]+=h-MM[5]*h;MM[14]-=MM[6]*h;gl.uniformMatrix4fv(U.uM,false,MM)}}
+
+/* first-person: 1 = cockpit, 2 = bonnet */
+function fpOn(){const f=S.cam.fp|0;if(!f||!player||state!=='play'||player.loop)return 0;if(Math.abs(player.roll||0)>.9||Math.abs((player.pitch||0)+(player.fp||0))>1.1||Math.abs(player.fr||0)>.9)return 0;return f}
+function fpGeo(type){const bb=(MESH[type]&&MESH[type].bb)||{h:1.4,hood:.7,zf:2.2,w:2,l:4.4},open=type==='formula';
+  const h=bb.h,cab=!open&&bb.hood>h-.3,ey=open?Math.max(.95,bb.hood+.35):cab?cl(h*.68,1.2,2.6):cl(Math.min(h-.18,bb.hood+.5),.85,3.3),ez=open?-.35:-.15;
+  return{bb,open,cab,ey,ez}}
+function lp(M,x,y,z){return[M[0]*x+M[4]*y+M[8]*z+M[12],M[1]*x+M[5]*y+M[9]*z+M[13],M[2]*x+M[6]*y+M[10]*z+M[14]]}
+function fpCam(f){const b=player,G=fpGeo(b.type);bodyModel(b);const M=MM.slice();
+  let ey=G.ey,ez=G.ez;if(f===2){if(G.cab){ey=G.ey-.3;ez=G.bb.zf+.1}else{ey=G.bb.hood+.42;ez=G.bb.zf*.3}}
+  const bob=Math.min(.04,Math.hypot(b.vx,b.vz)*.0006)*Math.sin(flashT*27),sk=shake*.25;
+  const eye=lp(M,R(-sk,sk),ey+bob+R(-sk,sk),ez),tg=lp(M,(b.steer||0)*-.6,ey-.55,ez+12);
+  return{eye,tgt:tg}}
+const CPIT={};
+function drawCockpit(b){const G=fpGeo(b.type);let m=CPIT[b.type];
+  if(!m){const a=[],{bb,open,cab,ey,ez}=G,w=bb.w,DK=[.07,.07,.08],TR=[.16,.16,.18],dz=ez+.72,dy=open?ey-.27:cab?ey-.3:Math.max(ey-.32,bb.hood+.06);
+    if(open){box(a,0,bb.hood-.12,(dz+bb.zf)/2,w*.26,.12,bb.zf-dz,BODY);box(a,0,ey-.5,dz-.1,w*.4,.16,.45,DK);
+      for(const sx of[-1,1])box(a,sx*w*.41,.05,bb.zf*.55,.34,.52,.6,TY);box(a,0,ey-.42,dz-.1,.04,.04,.4,TR)}
+    else{const hz0=dz-.15;if(!cab){box(a,0,bb.hood-.08,(hz0+bb.zf)/2,w*.88,.08,bb.zf-hz0,BODY);box(a,0,bb.hood-.06,(hz0+bb.zf)/2,.06,.075,bb.zf-hz0,[.6,.6,.62])}
+      box(a,0,dy-.2,dz,w*.94,.2,.36,DK);box(a,0,dy-.02,dz-.06,w*.94,.04,.26,TR);
+      const rf=bb.h-.05,pz=ez+.5;for(const sx of[-1,1]){const x0=sx*w*.46,x1=sx*w*.42;
+        hexa(a,[[x0-.06,dy-.05,dz+.3],[x0+.06,dy-.05,dz+.3],[x0+.06,dy-.05,dz+.44],[x0-.06,dy-.05,dz+.44]],[[x1-.06,rf,pz],[x1+.06,rf,pz],[x1+.06,rf,pz+.12],[x1-.06,rf,pz+.12]],BODY)}
+      box(a,0,rf-.04,pz+.12,w*.9,.05,.08,BODY);box(a,0,rf-.07,pz+.06,.17,.045,.025,TR)}
+    const wz=ez+.58,wy=open?ey-.4:dy-.02,r=open?.13:.18,sg=open?.026:.028;for(let i=0;i<48;i++){const t=i/48*6.2832;box(a,Math.cos(t)*r,wy+Math.sin(t)*r-sg/2,wz,sg*1.1,sg,sg,DK)}
+    box(a,0,wy-.03,wz+.02,.09,.06,.05,TR);box(a,0,wy-.012,wz+.015,r*1.95,.024,.024,DK);box(a,0,wy-r,wz+.015,.024,r,.024,DK);
+    m=CPIT[b.type]=mkVBO(a)}
+  b.col=paintOf(b.type);applyLook(b.type);gl.uniform3fv(U.uBody,b.col);gl.uniform3fv(U.uLA,[.85,.08,.06]);gl.uniform3fv(U.uLB,[.85,.08,.06]);
+  gl.uniform1f(U.uLiv,0);bodyModel(b);drawMesh(m)}
+function camName(){return['Chase cam','Cockpit cam','Bonnet cam'][S.cam.fp|0]}
+function cycleCam(){S.cam.fp=((S.cam.fp|0)+1)%3;save();feed(camName());if(!screens.paused.hidden&&pPanel==='cam')renderCam()}
 function drawBody(b){if(b===player&&b.kind==='player'&&state!=='menu'){b.col=paintOf(b.type);applyLook(b.type)}
   const fl=Math.floor(flashT*7)%2;let la=[.85,.08,.06],lb=[.85,.08,.06];
   if(b.kind==='cop'&&!b.dead){la=fl?[1,.1,.1]:[.35,.04,.04];lb=fl?[.1,.2,.5]:[.15,.45,1]}
@@ -2244,10 +2274,13 @@ function render(){
   if(playing&&S.cam.follow){const sv=Math.hypot(player.vx,player.vz),yt=sv>4&&!player.loop?Math.atan2(player.vx,player.vz):player.a;camYaw+=wrapA(yt-camYaw)*.06}else camYaw=Math.PI;
   const want=[tgt[0]-Math.sin(camYaw)*cD*Math.cos(cA),ty+cD*Math.sin(cA),tgt[2]-Math.cos(camYaw)*cD*Math.cos(cA)];
   for(let i=0;i<3;i++)camPos[i]=lerp(camPos[i],want[i],playing?.12:.04);for(let i=0;i<3;i++)camT[i]=lerp(camT[i],tgt[i],playing?.14:.04);
-  const sk=shake*1.4,eye=[camPos[0]+R(-sk,sk),camPos[1]+R(-sk,sk),camPos[2]+R(-sk,sk)];
-  setCam(eye,camT,.78,520);{const sf=stormFog();gl.uniform1f(U.uFogN,sf?sf.n:env.fogN);gl.uniform1f(U.uFogF,sf?sf.f:env.fogF);gl.uniform3fv(U.uFog,sf?sf.c:env.sky);if(sf){gl.clearColor(sf.c[0],sf.c[1],sf.c[2],1);gl.clear(gl.COLOR_BUFFER_BIT)}}
+  const fpv=fpOn();let eye;
+  if(fpv){const F=fpCam(fpv);eye=F.eye;for(let i=0;i<3;i++){camPos[i]=eye[i];camT[i]=F.tgt[i]}
+    setCam(eye,F.tgt,(C.width<C.height?1.3:1.02)+cl(sp/70,0,1)*.1+(nitroT>0?.06:0),560,.12)}
+  else{const sk=shake*1.4;eye=[camPos[0]+R(-sk,sk),camPos[1]+R(-sk,sk),camPos[2]+R(-sk,sk)];
+  setCam(eye,camT,.78,520)}{const sf=stormFog();gl.uniform1f(U.uFogN,sf?sf.n:env.fogN);gl.uniform1f(U.uFogF,sf?sf.f:env.fogF);gl.uniform3fv(U.uFog,sf?sf.c:env.sky);if(sf){gl.clearColor(sf.c[0],sf.c[1],sf.c[2],1);gl.clear(gl.COLOR_BUFFER_BIT)}}
   model(0,0,0,0,0,0,1);gl.uniform3fv(U.uBody,[1,1,1]);drawMesh(cityMesh);
-  const cull=playing&&(S.cam.follow||S.cam.ang<50||S.cam.dist>65)?280:200;
+  const cull=fpv?320:playing&&(S.cam.follow||S.cam.ang<50||S.cam.dist>65)?280:200;
   for(const L of lots){if(Math.abs((L.x0+L.x1)/2-t.x)>cull||Math.abs((L.z0+L.z1)/2-t.z)>cull)continue;drawMesh(L.mesh)}
   if(mode!=="stunt")drawHZ(t);
   if(mode==="gp"&&TRK&&TRK.lights&&gp){for(let k=0;k<5;k++){const c=TRK.lights[k],on=gp.phase==="lights"&&k<gp.lit;for(const dy of[0,-.75]){gl.uniform3fv(U.uBody,on?[2.6,.15,.1]:[.12,.04,.04]);model(c[0],c[1]+dy,c[2],TRK.pts[TRK.s0].a,0,0,1.25);drawMesh(MESH.xl)}}}
@@ -2258,11 +2291,11 @@ function render(){
   gl.uniform3fv(U.uBody,[1,1,1]);
   /* x-ray: where a building hides a car, draw its outline on top of the building */
   gl.depthFunc(gl.GREATER);gl.depthMask(false);gl.enable(gl.BLEND);gl.uniform1f(U.uSilOn,1);
-  for(const b of bodies){const isP=b===player;if(!(isP||b.kind==='cop'&&!b.dead)||Math.hypot(b.x-t.x,b.z-t.z)>90)continue;
+  for(const b of bodies){const isP=b===player;if(isP&&fpv)continue;if(!(isP||b.kind==='cop'&&!b.dead)||Math.hypot(b.x-t.x,b.z-t.z)>90)continue;
     gl.uniform3fv(U.uSil,isP?[1,.86,.2]:(Math.floor(flashT*7)%2?[1,.25,.25]:[.3,.55,1]));gl.uniform1f(U.uAlpha,isP?.85:.6);
     bodyModel(b,.4);drawMesh(MESH[b.type])}
   gl.uniform1f(U.uSilOn,0);gl.uniform1f(U.uAlpha,1);gl.disable(gl.BLEND);gl.depthMask(true);gl.depthFunc(gl.LESS);
-  for(const b of bodies){if(Math.hypot(b.x-t.x,b.z-t.z)>cull+60)continue;drawBody(b)}
+  for(const b of bodies){if(Math.hypot(b.x-t.x,b.z-t.z)>cull+60)continue;if(b===player&&fpv===1){drawCockpit(b);continue}drawBody(b)}
   gl.uniform3fv(U.uBody,[1,1,1]);
   for(const k of pickups){const m=k.type==='cash'?MESH.cash:MESH[k.type];model(k.x,1+Math.sin(k.t*3)*.3,k.z,k.t*2,0,0,k.type==='cash'?1:1.25);drawMesh(m)}
   for(const s of spikes){model(s.x,.02,s.z,s.a+Math.PI/2,0,0,1);drawMesh(MESH.strip)}
@@ -2366,7 +2399,7 @@ function updHUD(){
 function setGpDiff(v){S.gpDiff=GP_DIFF[v]?v:'medium';save();$('gpDiffBtn').textContent='Grand Prix AI: '+S.gpDiff[0].toUpperCase()+S.gpDiff.slice(1)}
 function setGpAuto(v){S.gpAuto=!!v;save();const b=$('gpAutoBtn');b.textContent='Grand Prix gears: '+(v?'Automatic':'Manual');b.setAttribute('aria-pressed',!!v)}
 function setAuto(v){S.auto=v;save();const b=$('autoBtn');b.textContent='Auto-drive: '+(v?'On':'Off');b.setAttribute('aria-pressed',v);
-  $('keysHint').innerHTML=(v?'Your car drives itself · ':'<kbd>↑</kbd> or <kbd>W</kbd> gas · ')+'<kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> steer · <kbd>Space</kbd> or <kbd>↓</kbd> brake and drift'+(v?'':' (hold when stopped to reverse)')+' · <kbd>P</kbd> pause · <kbd>M</kbd> mute · Stunt Park: in the air <kbd>↑</kbd> <kbd>↓</kbd> flip, <kbd>Space</kbd> + <kbd>←</kbd> <kbd>→</kbd> barrel roll, <kbd>R</kbd> reset car · Grand Prix: <kbd>E</kbd> or <kbd>Shift</kbd> gear up, <kbd>Q</kbd> gear down'}
+  $('keysHint').innerHTML=(v?'Your car drives itself · ':'<kbd>↑</kbd> or <kbd>W</kbd> gas · ')+'<kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> steer · <kbd>Space</kbd> or <kbd>↓</kbd> brake and drift'+(v?'':' (hold when stopped to reverse)')+' · <kbd>P</kbd> pause · <kbd>M</kbd> mute · <kbd>C</kbd> camera (chase, cockpit, bonnet) · Stunt Park: in the air <kbd>↑</kbd> <kbd>↓</kbd> flip, <kbd>Space</kbd> + <kbd>←</kbd> <kbd>→</kbd> barrel roll, <kbd>R</kbd> reset car · Grand Prix: <kbd>E</kbd> or <kbd>Shift</kbd> gear up, <kbd>Q</kbd> gear down'}
 function setMusic(v){S.music=v;save();const b=$('musicBtn');b.textContent='Music: '+(v?'On':'Off');b.setAttribute('aria-pressed',v)}
 $('autoBtn').onclick=()=>setAuto(!S.auto);
 const TODS={day:'Day',sunset:'Sunset',night:'Night'},RAINS={some:'Sometimes',never:'Never',always:'Always'};
@@ -2525,10 +2558,10 @@ function showResult(car,n,before,after,unlocked,tk,owned,parts){
 }
 $('spinBtn').onclick=()=>toSpins('garage');$('menuSpins').onclick=()=>toSpins('menu');
 $('spinBack').onclick=()=>{if(spinning)return;if(spinsBack==='garage')toGarage();else toMenu()};
-const CAMP={Classic:{ang:66,dist:50,follow:false},Overhead:{ang:84,dist:58,follow:false},Far:{ang:58,dist:78,follow:false},'Low chase':{ang:36,dist:34,follow:true},'Close chase':{ang:24,dist:24,follow:true}};
+const CAMP={Classic:{ang:66,dist:50,follow:false},Overhead:{ang:84,dist:58,follow:false},Far:{ang:58,dist:78,follow:false},'Low chase':{ang:36,dist:34,follow:true},'Close chase':{ang:24,dist:24,follow:true},Cockpit:{fp:1},Bonnet:{fp:2}};
 function renderCam(){const c=S.cam;$('camAng').value=c.ang;$('camDist').value=c.dist;$('camAngV').textContent=c.ang+'°';$('camDistV').textContent=c.dist<35?'close':c.dist<60?'medium':'far';
   $('camFix').setAttribute('aria-pressed',!c.follow);$('camFol').setAttribute('aria-pressed',c.follow);
-  $('camPre').innerHTML=Object.entries(CAMP).map(([k,v])=>`<button class="chip" data-cam="${k}" aria-pressed="${v.ang===c.ang&&v.dist===c.dist&&v.follow===c.follow}">${k}</button>`).join('')}
+  $('camPre').innerHTML=Object.entries(CAMP).map(([k,v])=>`<button class="chip" data-cam="${k}" aria-pressed="${v.fp?(c.fp|0)===v.fp:!c.fp&&v.ang===c.ang&&v.dist===c.dist&&v.follow===c.follow}">${k}</button>`).join('')}
 let pPanel='mis';
 function panel(w){w=w||'mis';const noA=mode==='chase'||mode==='gp';if(w==='attr'&&noA)w='mis';pPanel=w;$('attrTab').hidden=noA;
   for(const b of document.querySelectorAll('#pTabs button'))b.setAttribute('aria-selected',b.dataset.tab===w);
@@ -2539,9 +2572,9 @@ $('pTabs').addEventListener('click',e=>{const b=e.target.closest('button[data-ta
 function renderAttr(){$('attrList').innerHTML=ATTR.map((a,i)=>`<button data-at="${i}" aria-pressed="${!!nav&&nav.n===a.n}"><b>${a.n}</b><small>${a.d} · ${Math.round(Math.hypot(player.x-a.x,player.z-a.z))} m</small></button>`).join('')+(nav?'<button data-at="x"><b>Clear route</b><small>Stop showing arrows</small></button>':'')}
 $('attrList').addEventListener('click',e=>{const b=e.target.closest('button[data-at]');if(!b)return;if(b.dataset.at==='x'){setNav(null);renderAttr();return}setNav(ATTR[+b.dataset.at]);pause(false)});
 
-$('camAng').oninput=e=>{S.cam.ang=+e.target.value;save();renderCam()};$('camDist').oninput=e=>{S.cam.dist=+e.target.value;save();renderCam()};
-$('camFix').onclick=()=>{S.cam.follow=false;save();renderCam()};$('camFol').onclick=()=>{S.cam.follow=true;save();renderCam()};
-$('camPre').addEventListener('click',e=>{const b=e.target.closest('button[data-cam]');if(!b)return;S.cam={...CAMP[b.dataset.cam]};save();renderCam();const nb=$('camPre').querySelector(`[data-cam="${b.dataset.cam}"]`);if(nb)nb.focus()});
+$('camAng').oninput=e=>{S.cam.ang=+e.target.value;S.cam.fp=0;save();renderCam()};$('camDist').oninput=e=>{S.cam.dist=+e.target.value;S.cam.fp=0;save();renderCam()};
+$('camFix').onclick=()=>{S.cam.follow=false;S.cam.fp=0;save();renderCam()};$('camFol').onclick=()=>{S.cam.follow=true;S.cam.fp=0;save();renderCam()};
+$('camPre').addEventListener('click',e=>{const b=e.target.closest('button[data-cam]');if(!b)return;{const v=CAMP[b.dataset.cam];S.cam=v.fp?{...S.cam,fp:v.fp}:{...v,fp:0}}save();renderCam();const nb=$('camPre').querySelector(`[data-cam="${b.dataset.cam}"]`);if(nb)nb.focus()});
 $('pauseBtn').onclick=()=>pause(true);$('resumeBtn').onclick=()=>pause(false);$('quitBtn').onclick=()=>{paused=false;screens.paused.hidden=true;endRun(mode==='chase'?'BUSTED!':'PARK CLOSED')};
 $('muteBtn').onclick=()=>{audio();setMute(!S.mute)};
 
@@ -2554,6 +2587,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyM'){audio();setMute(!S.mute)}
   if((e.code==='KeyP'||e.code==='Escape')&&state==='play')pause(!paused);
   if(e.code==='KeyR'&&state==='play'&&mode!=='chase'&&!paused)respawn();
+  if(e.code==='KeyC'&&state==='play')cycleCam();
   if(e.code==='KeyH'&&state==='play'&&!paused)horn(cosOf(S.sel).h);
   if(mode==='gp'&&state==='play'&&!paused){if(e.code==='KeyE'||e.code==='ShiftLeft'||e.code==='ShiftRight')gpShift(1);if(e.code==='KeyQ')gpShift(-1)}
   if(state==='garage'){if(e.code==='ArrowLeft')$('gPrev').click();if(e.code==='ArrowRight')$('gNext').click();if(e.code==='Escape')toMenu()}
